@@ -223,6 +223,17 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
         
         // TODO: measures are not multihreadsafe!
         
+        // Try start value in main thread
+        WorkerResult startResult = _try(start, totalStart);
+        // Hard break
+        if (startResult == null) {
+            measures = new NewtonRaphsonMeasures(iterationsTotal, 0, (int) (System.currentTimeMillis() - totalStart), 0d);
+            return new Vector2D(Double.NaN, Double.NaN);
+        } else if (startResult.getSolution() != null && !startResult.getSolution().isNaN()) {
+            measures = new NewtonRaphsonMeasures(iterationsTotal, 0, (int) (System.currentTimeMillis() - totalStart), 0d);
+            return startResult.getSolution();
+        }
+        
         try {
             
             // Are startvalues present
@@ -245,7 +256,7 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
                     futures.add(executorCompletionService.submit(new Callable<Vector2D>() {
                         @Override
                         public Vector2D call() throws Exception {
-                            return _solveValues(start, preparedStartValues, iterationsPerThread, startIndex, stopIndex, thread == 0 ? true : false);
+                            return _solveValues(start, preparedStartValues, iterationsPerThread, startIndex, stopIndex, false);
                         }
                     }));
                 }
@@ -256,12 +267,11 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
                 // For each thread
                 for (int i = 0; i < numThreads; i++) {
                     // Execute
-                    final int thread = i;
                     // Worker thread
                     futures.add(executorCompletionService.submit(new Callable<Vector2D>() {
                         @Override
                         public Vector2D call() throws Exception {
-                            return _solveRandom(start, iterationsPerThread, thread == 0 ? true : false);
+                            return _solveRandom(start, iterationsPerThread, false);
                         }
                     }));
                 }
