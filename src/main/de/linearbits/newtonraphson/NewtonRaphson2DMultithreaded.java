@@ -215,7 +215,7 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
         return _solveMultithreaded(start);
     }
     
-    private Vector2D _solveMultithreaded(Vector2D start) {
+    private Vector2D _solveMultithreaded(final Vector2D start) {
         
         final int iterationsPerThread = (((double) iterationsTotal / (double) numThreads) <= 0) ? 1 : (int) ((double) iterationsTotal / (double) numThreads);
         
