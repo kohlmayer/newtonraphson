@@ -434,6 +434,7 @@ public class NewtonRaphson2D extends NewtonRaphsonConfiguration<NewtonRaphson2D>
         SquareMatrix2D derivatives = new SquareMatrix2D();
         final Derivation2D derivation = derivativeFunction != null ? null : new Derivation2D();
         int iterations = 0;
+        int totalIterations = 0;
         
         // Init timers
         final long startPerTry = System.currentTimeMillis();
@@ -443,10 +444,10 @@ public class NewtonRaphson2D extends NewtonRaphsonConfiguration<NewtonRaphson2D>
             
             // Check if thread has been interrupted
             if (Thread.interrupted()) {
-                return new Result(true, iterations, startPerTry);
+                return new Result(true, totalIterations, startPerTry);
             }
             
-            iterations++;
+            totalIterations++;
             
             // Without master function
             if (masterFunction == null) {
@@ -466,7 +467,7 @@ public class NewtonRaphson2D extends NewtonRaphsonConfiguration<NewtonRaphson2D>
                     final double quality = 1.0d - Math.sqrt((object.x * object.x) + (object.y * object.y));
                     
                     // Return
-                    return new Result(false, solution, quality, iterations, startPerTry);
+                    return new Result(false, solution, quality, totalIterations, startPerTry);
                 }
                 
                 // Derive
@@ -494,7 +495,7 @@ public class NewtonRaphson2D extends NewtonRaphsonConfiguration<NewtonRaphson2D>
                     final double quality = 1.0d - Math.sqrt((object.x * object.x) + (object.y * object.y));
                     
                     // Return
-                    return new Result(false, solution, quality, iterations, startPerTry);
+                    return new Result(false, solution, quality, totalIterations, startPerTry);
                 }
             }
             
@@ -507,7 +508,7 @@ public class NewtonRaphson2D extends NewtonRaphsonConfiguration<NewtonRaphson2D>
             if (constraints != null) {
                 for (final Constraint2D constraint : constraints) {
                     if (!constraint.evaluate(solution)) {
-                        return new Result(false, iterations, startPerTry);
+                        return new Result(false, totalIterations, startPerTry);
                     }
                 }
             }
@@ -515,14 +516,14 @@ public class NewtonRaphson2D extends NewtonRaphsonConfiguration<NewtonRaphson2D>
             // Error or constraint reached
             final long time = System.currentTimeMillis();
             if (solution.isNaN() ||
-                (iterations >= iterationsPerTry) ||
+                (iterations++ >= iterationsPerTry) ||
                 ((time - startPerTry) > timePerTry)) {
-                return new Result(false, iterations, startPerTry);
+                return new Result(false, totalIterations, startPerTry);
             }
             
             // Timing limit
             if ((time - totalStart) > timeTotal) {
-                return new Result(true, iterations, startPerTry);
+                return new Result(true, totalIterations, startPerTry);
             }
         }
     }
