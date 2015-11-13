@@ -41,13 +41,13 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
      * @param numThreads
      * @return
      */
-    public static final ExecutorService createPool(int numThreads) {
-        ExecutorService executor = Executors.newFixedThreadPool(numThreads, new ThreadFactory() {
+    public static final ExecutorService createPool(final int numThreads) {
+        final ExecutorService executor = Executors.newFixedThreadPool(numThreads, new ThreadFactory() {
             int count = 0;
             
             @Override
-            public Thread newThread(Runnable r) {
-                Thread thread = new Thread(r);
+            public Thread newThread(final Runnable r) {
+                final Thread thread = new Thread(r);
                 thread.setDaemon(true);
                 thread.setName("NewtonRaphson Solver " + count++);
                 return thread;
@@ -69,8 +69,9 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
      * Creates a new instance
      * @param function
      */
-    public NewtonRaphson2DMultithreaded(Function<Vector2D, Pair<Vector2D, SquareMatrix2D>> function) {
+    public NewtonRaphson2DMultithreaded(final ExecutorService executor, final int numThreads, final Function<Vector2D, Pair<Vector2D, SquareMatrix2D>> function) {
         super(function);
+        init(executor, numThreads);
     }
     
     /**
@@ -78,9 +79,12 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
      * @param function
      * @param constraints
      */
-    public NewtonRaphson2DMultithreaded(Function<Vector2D, Pair<Vector2D, SquareMatrix2D>> function,
-                                        Constraint2D... constraints) {
+    public NewtonRaphson2DMultithreaded(final ExecutorService executor,
+                                        final int numThreads,
+                                        final Function<Vector2D, Pair<Vector2D, SquareMatrix2D>> function,
+                                        final Constraint2D... constraints) {
         super(function, constraints);
+        init(executor, numThreads);
     }
     
     /**
@@ -88,9 +92,12 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
      * @param functions
      * @param derivatives
      */
-    public NewtonRaphson2DMultithreaded(Function<Vector2D, Vector2D> functions,
-                                        Function<Vector2D, SquareMatrix2D> derivatives) {
+    public NewtonRaphson2DMultithreaded(final ExecutorService executor,
+                                        final int numThreads,
+                                        final Function<Vector2D, Vector2D> functions,
+                                        final Function<Vector2D, SquareMatrix2D> derivatives) {
         super(functions, derivatives);
+        init(executor, numThreads);
     }
     
     /**
@@ -99,10 +106,13 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
      * @param derivatives
      * @param constraints
      */
-    public NewtonRaphson2DMultithreaded(Function<Vector2D, Vector2D> functions,
-                                        Function<Vector2D, SquareMatrix2D> derivatives,
-                                        Constraint2D... constraints) {
+    public NewtonRaphson2DMultithreaded(final ExecutorService executor,
+                                        final int numThreads,
+                                        final Function<Vector2D, Vector2D> functions,
+                                        final Function<Vector2D, SquareMatrix2D> derivatives,
+                                        final Constraint2D... constraints) {
         super(functions, derivatives, constraints);
+        init(executor, numThreads);
     }
     
     /**
@@ -110,9 +120,12 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
      * @param function1
      * @param function2
      */
-    public NewtonRaphson2DMultithreaded(Function2D function1,
-                                        Function2D function2) {
+    public NewtonRaphson2DMultithreaded(final ExecutorService executor,
+                                        final int numThreads,
+                                        final Function2D function1,
+                                        final Function2D function2) {
         super(function1, function2);
+        init(executor, numThreads);
     }
     
     /**
@@ -121,10 +134,13 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
      * @param derivatives
      * @param constraints
      */
-    public NewtonRaphson2DMultithreaded(Function2D functions,
-                                        Function2D derivatives,
-                                        Constraint2D... constraints) {
+    public NewtonRaphson2DMultithreaded(final ExecutorService executor,
+                                        final int numThreads,
+                                        final Function2D functions,
+                                        final Function2D derivatives,
+                                        final Constraint2D... constraints) {
         super(functions, derivatives, constraints);
+        init(executor, numThreads);
     }
     
     /**
@@ -133,10 +149,13 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
      * @param function2
      * @param derivatives
      */
-    public NewtonRaphson2DMultithreaded(Function2D function1,
-                                        Function2D function2,
-                                        Function<Vector2D, SquareMatrix2D> derivatives) {
+    public NewtonRaphson2DMultithreaded(final ExecutorService executor,
+                                        final int numThreads,
+                                        final Function2D function1,
+                                        final Function2D function2,
+                                        final Function<Vector2D, SquareMatrix2D> derivatives) {
         super(function1, function2, derivatives);
+        init(executor, numThreads);
     }
     
     /**
@@ -146,11 +165,14 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
      * @param derivatives
      * @param constraints
      */
-    public NewtonRaphson2DMultithreaded(Function2D function1,
-                                        Function2D function2,
-                                        Function<Vector2D, SquareMatrix2D> derivatives,
-                                        Constraint2D... constraints) {
+    public NewtonRaphson2DMultithreaded(final ExecutorService executor,
+                                        final int numThreads,
+                                        final Function2D function1,
+                                        final Function2D function2,
+                                        final Function<Vector2D, SquareMatrix2D> derivatives,
+                                        final Constraint2D... constraints) {
         super(function1, function2, derivatives, constraints);
+        init(executor, numThreads);
     }
     
     /**
@@ -162,13 +184,16 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
      * @param derivative21
      * @param derivative22
      */
-    public NewtonRaphson2DMultithreaded(final Function2D function1,
+    public NewtonRaphson2DMultithreaded(final ExecutorService executor,
+                                        final int numThreads,
+                                        final Function2D function1,
                                         final Function2D function2,
                                         final Function2D derivative11,
                                         final Function2D derivative12,
                                         final Function2D derivative21,
                                         final Function2D derivative22) {
         super(function1, function2, derivative11, derivative12, derivative21, derivative22);
+        init(executor, numThreads);
     }
     
     /**
@@ -181,7 +206,9 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
      * @param derivative22
      * @param constraints
      */
-    public NewtonRaphson2DMultithreaded(final Function2D function1,
+    public NewtonRaphson2DMultithreaded(final ExecutorService executor,
+                                        final int numThreads,
+                                        final Function2D function1,
                                         final Function2D function2,
                                         final Function2D derivative11,
                                         final Function2D derivative12,
@@ -189,17 +216,7 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
                                         final Function2D derivative22,
                                         final Constraint2D... constraints) {
         super(function1, function2, derivative11, derivative12, derivative21, derivative22, constraints);
-    }
-    
-    /**
-     * Provide the ExecutorService. Resource management (e.g. shutdown) has to be done externally.
-     * @param executor
-     * @param numThreads
-     */
-    public void init(ExecutorService executor, int numThreads) {
-        this.numThreads = numThreads;
-        executorCompletionService = new ExecutorCompletionService<Vector2D>(executor);
-        futures = new ArrayList<Future<Vector2D>>();
+        init(executor, numThreads);
     }
     
     @Override
@@ -208,7 +225,7 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
     }
     
     @Override
-    public Vector2D solve(Vector2D start) {
+    public Vector2D solve(final Vector2D start) {
         if (executorCompletionService == null) {
             throw new IllegalArgumentException("No ExecutorService configured. Use 'init(ExecutorService executor, int numThreads)' before solving.");
         }
@@ -224,12 +241,12 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
         // TODO: measures are not multihreadsafe!
         
         // Try start value in main thread
-        WorkerResult startResult = _try(start, totalStart);
+        final WorkerResult startResult = _try(start, totalStart);
         // Hard break
         if (startResult == null) {
             measures = new NewtonRaphsonMeasures(iterationsTotal, 0, (int) (System.currentTimeMillis() - totalStart), 0d);
             return new Vector2D(Double.NaN, Double.NaN);
-        } else if (startResult.getSolution() != null && !startResult.getSolution().isNaN()) {
+        } else if ((startResult.getSolution() != null) && !startResult.getSolution().isNaN()) {
             measures = new NewtonRaphsonMeasures(iterationsTotal, 0, (int) (System.currentTimeMillis() - totalStart), 0d);
             return startResult.getSolution();
         }
@@ -278,7 +295,7 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
             }
             
             for (int i = 0; i < futures.size(); i++) {
-                Vector2D result = executorCompletionService.take().get();
+                final Vector2D result = executorCompletionService.take().get();
                 // Vector2D result = futures.get(i).get();
                 if ((result != null) && !result.isNaN()) {
                     return result;
@@ -290,7 +307,7 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
             e.printStackTrace();
         } finally {
             // Cancel all running threads
-            for (Future<Vector2D> f : futures) {
+            for (final Future<Vector2D> f : futures) {
                 f.cancel(true);
             }
             futures.clear();
@@ -303,6 +320,17 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
         // Nothing found
         return new Vector2D(Double.NaN, Double.NaN);
         
+    }
+    
+    /**
+     * Provide the ExecutorService. Resource management (e.g. shutdown) has to be done externally.
+     * @param executor
+     * @param numThreads
+     */
+    private void init(final ExecutorService executor, final int numThreads) {
+        this.numThreads = numThreads;
+        executorCompletionService = new ExecutorCompletionService<Vector2D>(executor);
+        futures = new ArrayList<Future<Vector2D>>();
     }
     
 }
