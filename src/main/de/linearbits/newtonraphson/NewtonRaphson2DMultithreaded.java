@@ -27,9 +27,9 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
 
 /**
- * The class implements the Newton-Raphson algorithm
+ * The class implements a multithreadeed version of the Newton-Raphson algorithm
  * 
- * @author Fabian Prasser
+ * @author Florian Kohlmayer
  */
 public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
     
@@ -37,7 +37,7 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
     private static final long serialVersionUID = -7468092557502640336L;
     
     /**
-     * Helper method to create a ExecutorService. The returned value can be provided to the init method.
+     * Helper method to create a ExecutorService. The returned value can be provided to the constructor.
      * @param numThreads
      * @return
      */
@@ -49,7 +49,7 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
             public Thread newThread(final Runnable r) {
                 final Thread thread = new Thread(r);
                 thread.setDaemon(true);
-                thread.setName("NewtonRaphson Solver " + count++);
+                thread.setName("NewtonRaphson Solver " + this.count++);
                 return thread;
             }
         });
@@ -57,14 +57,14 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
     }
     
     /** The executor completion service */
-    private CompletionService<Vector2D> executorCompletionService;
-                                        
+    private CompletionService<Result> executorCompletionService;
+                                      
     /** The list of futures */
-    private List<Future<Vector2D>>      futures;
-                                        
+    private List<Future<Result>>      futures;
+                                      
     /** The number of threads */
-    private int                         numThreads;
-                                        
+    private int                       numThreads;
+                                      
     /**
      * Creates a new instance
      * @param function
@@ -226,54 +226,64 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
     
     @Override
     public Vector2D solve(final Vector2D start) {
-        if (executorCompletionService == null) {
-            throw new IllegalArgumentException("No ExecutorService configured. Use 'init(ExecutorService executor, int numThreads)' before solving.");
-        }
         return _solveMultithreaded(start);
     }
     
     private Vector2D _solveMultithreaded(final Vector2D start) {
         
-        final int iterationsPerThread = (((double) iterationsTotal / (double) numThreads) <= 0) ? 1 : (int) ((double) iterationsTotal / (double) numThreads);
-        
+        final int iterationsPerThread = (((double) this.iterationsTotal / (double) this.numThreads) <= 0) ? 1 : (int) ((double) this.iterationsTotal / (double) this.numThreads);
         final long totalStart = System.currentTimeMillis();
-        
-        // TODO: measures are not multihreadsafe!
+        int totalIterations = 0;
+        int totalTries = 0;
         
         // Try start value in main thread
-        final WorkerResult startResult = _try(start, totalStart);
-        // Hard break
-        if (startResult == null) {
-            measures = new NewtonRaphsonMeasures(iterationsTotal, 0, (int) (System.currentTimeMillis() - totalStart), 0d);
+        Result result = _try(start, totalStart);
+        totalIterations += result.getIterationsPerTry();
+        
+        if (result.isTerminate()) { // Immediate termination
+            result.setTriesTotal(1);
+            result.setTimeTotal((int) (System.currentTimeMillis() - totalStart));
+            result.setIterationsTotal(totalIterations);
+            this.measures = new NewtonRaphsonMeasures(result.getIterationsTotal(),
+                                                      result.getTriesTotal(),
+                                                      result.getTimeTotal(),
+                                                      0d);
             return new Vector2D(Double.NaN, Double.NaN);
-        } else if ((startResult.getSolution() != null) && !startResult.getSolution().isNaN()) {
-            measures = new NewtonRaphsonMeasures(iterationsTotal, 0, (int) (System.currentTimeMillis() - totalStart), 0d);
-            return startResult.getSolution();
+        } else if (result.getSolution() != null) { // Solution found
+            result.setTriesTotal(1);
+            result.setTimeTotal((int) (System.currentTimeMillis() - totalStart));
+            result.setIterationsTotal(totalIterations);
+            this.measures = new NewtonRaphsonMeasures(result.getIterationsTotal(),
+                                                      result.getTriesTotal(),
+                                                      result.getTimeTotal(),
+                                                      result.getQuality());
+            return result.getSolution();
         }
         
+        // Further tries are forked
         try {
             
             // Are startvalues present
-            if (preparedStartValues != null) {
+            if (this.preparedStartValues != null) {
                 
-                int stepping = (int) ((double) preparedStartValues.length / (double) numThreads);
+                int stepping = (int) ((double) this.preparedStartValues.length / (double) this.numThreads);
                 if (stepping <= 0) {
                     stepping = 1;
                 }
                 
                 // For each thread
-                for (int i = 0; i < numThreads; i++) {
+                for (int i = 0; i < this.numThreads; i++) {
                     
                     // Execute
                     final int thread = i;
                     final int startIndex = thread * stepping;
-                    final int stopIndex = thread == (numThreads - 1) ? preparedStartValues.length : (thread + 1) * stepping;
+                    final int stopIndex = thread == (this.numThreads - 1) ? this.preparedStartValues.length : (thread + 1) * stepping;
                     
                     // Worker thread
-                    futures.add(executorCompletionService.submit(new Callable<Vector2D>() {
+                    this.futures.add(this.executorCompletionService.submit(new Callable<Result>() {
                         @Override
-                        public Vector2D call() throws Exception {
-                            return _solveValues(start, preparedStartValues, iterationsPerThread, startIndex, stopIndex, false);
+                        public Result call() throws Exception {
+                            return _solveValues(start, NewtonRaphson2DMultithreaded.this.preparedStartValues, iterationsPerThread, startIndex, stopIndex, false);
                         }
                     }));
                 }
@@ -282,43 +292,57 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
                 // Use random guesses
                 
                 // For each thread
-                for (int i = 0; i < numThreads; i++) {
+                for (int i = 0; i < this.numThreads; i++) {
                     // Execute
                     // Worker thread
-                    futures.add(executorCompletionService.submit(new Callable<Vector2D>() {
+                    this.futures.add(this.executorCompletionService.submit(new Callable<Result>() {
                         @Override
-                        public Vector2D call() throws Exception {
+                        public Result call() throws Exception {
                             return _solveRandom(start, iterationsPerThread, false);
                         }
                     }));
                 }
             }
             
-            for (int i = 0; i < futures.size(); i++) {
-                final Vector2D result = executorCompletionService.take().get();
-                // Vector2D result = futures.get(i).get();
-                if ((result != null) && !result.isNaN()) {
-                    return result;
+            for (int i = 0; i < this.futures.size(); i++) {
+                result = this.executorCompletionService.take().get();
+                totalIterations += result.getIterationsPerTry();
+                totalTries += result.getTriesTotal();
+                
+                // Immediate termination or solution found
+                if (result.isTerminate() || (result.getSolution() != null)) {
+                    break;
                 }
             }
+            result.setTriesTotal(totalTries);
+            result.setTimeTotal((int) (System.currentTimeMillis() - totalStart));
+            result.setIterationsTotal(totalIterations);
         } catch (
                 InterruptedException
                 | ExecutionException e) {
             e.printStackTrace();
         } finally {
             // Cancel all running threads
-            for (final Future<Vector2D> f : futures) {
+            for (final Future<Result> f : this.futures) {
                 f.cancel(true);
             }
-            futures.clear();
+            this.futures.clear();
         }
         
-        // TODO: use the correct measures
-        // Store measures
-        measures = new NewtonRaphsonMeasures(iterationsTotal, 0, (int) (System.currentTimeMillis() - totalStart), 0d);
-        
-        // Nothing found
-        return new Vector2D(Double.NaN, Double.NaN);
+        // No solution found
+        if (result.getSolution() == null) {
+            this.measures = new NewtonRaphsonMeasures(result.getIterationsTotal(),
+                                                      result.getTriesTotal(),
+                                                      result.getTimeTotal(),
+                                                      0d);
+            return new Vector2D(Double.NaN, Double.NaN);
+        } else {
+            this.measures = new NewtonRaphsonMeasures(result.getIterationsTotal(),
+                                                      result.getTriesTotal(),
+                                                      result.getTimeTotal(),
+                                                      result.getQuality());
+            return result.getSolution();
+        }
         
     }
     
@@ -329,8 +353,8 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
      */
     private void init(final ExecutorService executor, final int numThreads) {
         this.numThreads = numThreads;
-        executorCompletionService = new ExecutorCompletionService<Vector2D>(executor);
-        futures = new ArrayList<Future<Vector2D>>();
+        this.executorCompletionService = new ExecutorCompletionService<Result>(executor);
+        this.futures = new ArrayList<Future<Result>>();
     }
     
 }
