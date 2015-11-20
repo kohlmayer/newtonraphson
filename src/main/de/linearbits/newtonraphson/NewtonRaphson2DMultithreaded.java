@@ -226,7 +226,11 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
     
     @Override
     public Vector2D solve(final Vector2D start) {
-        return _solveMultithreaded(start);
+        if (numThreads == 0) {
+            return super.solve(start);
+        } else {
+            return _solveMultithreaded(start);
+        }
     }
     
     private Vector2D _solveMultithreaded(final Vector2D start) {
