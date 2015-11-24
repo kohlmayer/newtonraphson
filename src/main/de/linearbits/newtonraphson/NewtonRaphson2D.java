@@ -332,11 +332,16 @@ public class NewtonRaphson2D extends NewtonRaphsonConfiguration<NewtonRaphson2D>
         }
         
         // No solution found
-        if (result.getSolution() == null) {
-            measures = new NewtonRaphsonMeasures(result.getIterationsTotal(),
-                                                 result.getTriesTotal(),
-                                                 result.getTimeTotal(),
-                                                 0d);
+        if (result == null || result.getSolution() == null) {
+            if (result != null) {
+                measures = new NewtonRaphsonMeasures(result.getIterationsTotal(),
+                                                     result.getTriesTotal(),
+                                                     result.getTimeTotal(),
+                                                     0d);
+            } else {
+                // TODO Measures are null!
+                this.measures = null;
+            }
             // Nothing found
             return new Vector2D(Double.NaN, Double.NaN);
         } else {
@@ -379,10 +384,14 @@ public class NewtonRaphson2D extends NewtonRaphsonConfiguration<NewtonRaphson2D>
             }
         }
         
-        result.setTriesTotal(totalTries);
-        result.setTimeTotal((int) (System.currentTimeMillis() - totalStart));
-        result.setIterationsTotal(totalIterations);
-        return result;
+        if (result.getSolution() != null) {
+            result.setTriesTotal(totalTries);
+            result.setTimeTotal((int) (System.currentTimeMillis() - totalStart));
+            result.setIterationsTotal(totalIterations);
+            return result;
+        } else {
+            return null;
+        }
     }
     
     protected Result _solveValues(final Vector2D start, final double[][] values, final int maxIterations, final int startIndex, final int stopIndex, boolean useStartValue) {
@@ -415,10 +424,14 @@ public class NewtonRaphson2D extends NewtonRaphsonConfiguration<NewtonRaphson2D>
             }
         }
         
-        result.setTriesTotal(totalTries);
-        result.setTimeTotal((int) (System.currentTimeMillis() - totalStart));
-        result.setIterationsTotal(totalIterations);
-        return result;
+        if (result.getSolution() != null) {
+            result.setTriesTotal(totalTries);
+            result.setTimeTotal((int) (System.currentTimeMillis() - totalStart));
+            result.setIterationsTotal(totalIterations);
+            return result;
+        } else {
+            return null;
+        }
     }
     
     /**

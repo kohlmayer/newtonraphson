@@ -15,16 +15,7 @@
  */
 package de.linearbits.newtonraphson;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.Callable;
-import java.util.concurrent.CompletionService;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorCompletionService;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.ThreadFactory;
 
 /**
  * The class implements a multithreadeed version of the Newton-Raphson algorithm
@@ -37,39 +28,26 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
     private static final long serialVersionUID = -7468092557502640336L;
     
     /**
-     * Helper method to create a ExecutorService. The returned value can be provided to the constructor.
+     * Helper method to create a ThreadPool<Result>. The returned value can be provided to the constructor.
      * @param numThreads
      * @return
      */
-    public static final ExecutorService createPool(final int numThreads) {
-        final ExecutorService executor = Executors.newFixedThreadPool(numThreads, new ThreadFactory() {
-            int count = 0;
-            
-            @Override
-            public Thread newThread(final Runnable r) {
-                final Thread thread = new Thread(r);
-                thread.setDaemon(true);
-                thread.setName("NewtonRaphson Solver " + this.count++);
-                return thread;
-            }
-        });
+    public static final ThreadPool<Result> createPool(final int numThreads) {
+        final ThreadPool<Result> executor = new ThreadPool<>(numThreads);
         return executor;
     }
     
-    /** The list of futures */
-    private List<Future<Result>> futures;
-                                 
     /** The number of threads */
-    private int                  numThreads;
-                                 
+    private int                numThreads;
+                               
     /** The executor */
-    private ExecutorService      executor;
-                                 
+    private ThreadPool<Result> executor;
+                               
     /**
      * Creates a new instance
      * @param function
      */
-    public NewtonRaphson2DMultithreaded(final ExecutorService executor, final int numThreads, final Function<Vector2D, Pair<Vector2D, SquareMatrix2D>> function) {
+    public NewtonRaphson2DMultithreaded(final ThreadPool<Result> executor, final int numThreads, final Function<Vector2D, Pair<Vector2D, SquareMatrix2D>> function) {
         super(function);
         init(executor, numThreads);
     }
@@ -79,7 +57,7 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
      * @param function
      * @param constraints
      */
-    public NewtonRaphson2DMultithreaded(final ExecutorService executor,
+    public NewtonRaphson2DMultithreaded(final ThreadPool<Result> executor,
                                         final int numThreads,
                                         final Function<Vector2D, Pair<Vector2D, SquareMatrix2D>> function,
                                         final Constraint2D... constraints) {
@@ -92,7 +70,7 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
      * @param functions
      * @param derivatives
      */
-    public NewtonRaphson2DMultithreaded(final ExecutorService executor,
+    public NewtonRaphson2DMultithreaded(final ThreadPool<Result> executor,
                                         final int numThreads,
                                         final Function<Vector2D, Vector2D> functions,
                                         final Function<Vector2D, SquareMatrix2D> derivatives) {
@@ -106,7 +84,7 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
      * @param derivatives
      * @param constraints
      */
-    public NewtonRaphson2DMultithreaded(final ExecutorService executor,
+    public NewtonRaphson2DMultithreaded(final ThreadPool<Result> executor,
                                         final int numThreads,
                                         final Function<Vector2D, Vector2D> functions,
                                         final Function<Vector2D, SquareMatrix2D> derivatives,
@@ -120,7 +98,7 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
      * @param function1
      * @param function2
      */
-    public NewtonRaphson2DMultithreaded(final ExecutorService executor,
+    public NewtonRaphson2DMultithreaded(final ThreadPool<Result> executor,
                                         final int numThreads,
                                         final Function2D function1,
                                         final Function2D function2) {
@@ -134,7 +112,7 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
      * @param derivatives
      * @param constraints
      */
-    public NewtonRaphson2DMultithreaded(final ExecutorService executor,
+    public NewtonRaphson2DMultithreaded(final ThreadPool<Result> executor,
                                         final int numThreads,
                                         final Function2D functions,
                                         final Function2D derivatives,
@@ -149,7 +127,7 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
      * @param function2
      * @param derivatives
      */
-    public NewtonRaphson2DMultithreaded(final ExecutorService executor,
+    public NewtonRaphson2DMultithreaded(final ThreadPool<Result> executor,
                                         final int numThreads,
                                         final Function2D function1,
                                         final Function2D function2,
@@ -165,7 +143,7 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
      * @param derivatives
      * @param constraints
      */
-    public NewtonRaphson2DMultithreaded(final ExecutorService executor,
+    public NewtonRaphson2DMultithreaded(final ThreadPool<Result> executor,
                                         final int numThreads,
                                         final Function2D function1,
                                         final Function2D function2,
@@ -184,7 +162,7 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
      * @param derivative21
      * @param derivative22
      */
-    public NewtonRaphson2DMultithreaded(final ExecutorService executor,
+    public NewtonRaphson2DMultithreaded(final ThreadPool<Result> executor,
                                         final int numThreads,
                                         final Function2D function1,
                                         final Function2D function2,
@@ -206,7 +184,7 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
      * @param derivative22
      * @param constraints
      */
-    public NewtonRaphson2DMultithreaded(final ExecutorService executor,
+    public NewtonRaphson2DMultithreaded(final ThreadPool<Result> executor,
                                         final int numThreads,
                                         final Function2D function1,
                                         final Function2D function2,
@@ -265,82 +243,71 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
         }
         
         // Further tries are forked
-        try {
+        
+        // Are startvalues present
+        if (this.preparedStartValues != null) {
             
-            CompletionService<Result> executorCompletionService = new ExecutorCompletionService<Result>(this.executor);
-            
-            // Are startvalues present
-            if (this.preparedStartValues != null) {
-                
-                int stepping = (int) ((double) this.preparedStartValues.length / (double) this.numThreads);
-                if (stepping <= 0) {
-                    stepping = 1;
-                }
-                
-                // For each thread
-                for (int i = 0; i < this.numThreads; i++) {
-                    
-                    // Execute
-                    final int thread = i;
-                    final int startIndex = thread * stepping;
-                    final int stopIndex = thread == (this.numThreads - 1) ? this.preparedStartValues.length : (thread + 1) * stepping;
-                    
-                    // Worker thread
-                    this.futures.add(executorCompletionService.submit(new Callable<Result>() {
-                        @Override
-                        public Result call() throws Exception {
-                            return _solveValues(start, NewtonRaphson2DMultithreaded.this.preparedStartValues, iterationsPerThread, startIndex, stopIndex, false);
-                        }
-                    }));
-                }
-                
-            } else {
-                // Use random guesses
-                
-                // For each thread
-                for (int i = 0; i < this.numThreads; i++) {
-                    // Execute
-                    // Worker thread
-                    this.futures.add(executorCompletionService.submit(new Callable<Result>() {
-                        @Override
-                        public Result call() throws Exception {
-                            return _solveRandom(start, iterationsPerThread, false);
-                        }
-                    }));
-                }
+            int stepping = (int) ((double) this.preparedStartValues.length / (double) this.numThreads);
+            if (stepping <= 0) {
+                stepping = 1;
             }
             
-            for (int i = 0; i < this.futures.size(); i++) {
-                result = executorCompletionService.take().get();
-                totalIterations += result.getIterationsPerTry();
-                totalTries += result.getTriesTotal();
+            // For each thread
+            for (int i = 0; i < this.numThreads; i++) {
                 
-                // Immediate termination or solution found
-                if (result.isTerminate() || (result.getSolution() != null)) {
-                    break;
-                }
+                // Execute
+                final int thread = i;
+                final int startIndex = thread * stepping;
+                final int stopIndex = thread == (this.numThreads - 1) ? this.preparedStartValues.length : (thread + 1) * stepping;
+                
+                // Worker thread
+                executor.submit(new Callable<Result>() {
+                    @Override
+                    public Result call() throws Exception {
+                        return _solveValues(start, NewtonRaphson2DMultithreaded.this.preparedStartValues, iterationsPerThread, startIndex, stopIndex, false);
+                    }
+                });
             }
+            
+        } else {
+            // Use random guesses
+            
+            // For each thread
+            for (int i = 0; i < this.numThreads; i++) {
+                // Execute
+                // Worker thread
+                executor.submit(new Callable<Result>() {
+                    
+                    @Override
+                    public Result call() throws Exception {
+                        return _solveRandom(start, iterationsPerThread, false);
+                    }
+                });
+            }
+        }
+        
+        result = executor.invokeFirstResult();
+        
+        if (result != null && result.getSolution() != null) {
+            totalIterations += result.getIterationsPerTry();
+            totalTries += result.getTriesTotal();
+            
             result.setTriesTotal(totalTries);
             result.setTimeTotal((int) (System.currentTimeMillis() - totalStart));
             result.setIterationsTotal(totalIterations);
-        } catch (
-                InterruptedException
-                | ExecutionException e) {
-            e.printStackTrace();
-        } finally {
-            // Cancel all running threads
-            for (final Future<Result> f : this.futures) {
-                f.cancel(true);
-            }
-            this.futures.clear();
         }
         
         // No solution found
-        if (result.getSolution() == null) {
-            this.measures = new NewtonRaphsonMeasures(result.getIterationsTotal(),
-                                                      result.getTriesTotal(),
-                                                      result.getTimeTotal(),
-                                                      0d);
+        if (result == null || result.getSolution() == null) {
+            if (result != null) {
+                this.measures = new NewtonRaphsonMeasures(result.getIterationsTotal(),
+                                                          result.getTriesTotal(),
+                                                          result.getTimeTotal(),
+                                                          0d);
+            } else {
+                // TODO Measures are null!
+                this.measures = null;
+            }
             return new Vector2D(Double.NaN, Double.NaN);
         } else {
             this.measures = new NewtonRaphsonMeasures(result.getIterationsTotal(),
@@ -353,14 +320,13 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
     }
     
     /**
-     * Provide the ExecutorService. Resource management (e.g. shutdown) has to be done externally.
+     * Provide the ThreadPool<Result>. Resource management (e.g. shutdown) has to be done externally.
      * @param executor
      * @param numThreads
      */
-    private void init(final ExecutorService executor, final int numThreads) {
+    private void init(final ThreadPool<Result> executor, final int numThreads) {
         this.numThreads = numThreads;
         this.executor = executor;
-        this.futures = new ArrayList<Future<Result>>();
     }
     
 }
