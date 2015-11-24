@@ -8,30 +8,55 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class ThreadPool<T> {
     
     /**
+     * Class wrapping a callable and an assigned result bucket.
+     * @param <T>
+     */
+    static class JobHolder<T> {
+        
+        private final Callable<T> job;
+        private final int         resultBucket;
+                                  
+        public JobHolder(Callable<T> job, int resultBucket) {
+            this.job = job;
+            this.resultBucket = resultBucket;
+        }
+        
+        public Callable<T> getJob() {
+            return this.job;
+        }
+        
+        public int getResultBucket() {
+            return this.resultBucket;
+        }
+        
+    }
+    
+    /**
      * Class wrapping the thread object.
      * @param <T>
      */
-    static class PoolThread<T> extends Thread {
+    static class PoolThread<T> implements Runnable {
         
-        private final BlockingQueue<Callable<T>> queue;
-        private boolean                          isClosed;
-        private final Object[]                   results;
-        private final int                        numThread;
-        private final Thread                     mainThread;
-        private AtomicInteger                    latch;
-                                                 
-        public PoolThread(final int numThread, final Object[] results, BlockingQueue<Callable<T>> queue, Thread mainThread) {
+        private final BlockingQueue<JobHolder<T>> queue;
+        private boolean                           isClosed;
+        private final Object[]                    results;
+        private final Thread                      mainThread;
+        private final Thread                      self;
+        private AtomicInteger                     latch;
+                                                  
+        public PoolThread(final Object[] results, BlockingQueue<JobHolder<T>> queue, Thread mainThread) {
             this.queue = queue;
             this.isClosed = false;
-            this.numThread = numThread;
             this.results = results;
             this.mainThread = mainThread;
-            this.setDaemon(true);
+            this.self = new Thread(this);
+            this.self.setDaemon(true);
+            this.self.start();
         }
         
         public synchronized void close() {
             this.isClosed = true;
-            interrupt(); // break pool thread out of take() call.
+            this.self.interrupt(); // break pool thread out of take() call.
         }
         
         public synchronized boolean isClosed() {
@@ -43,10 +68,12 @@ public class ThreadPool<T> {
             while (!isClosed()) {
                 try {
                     
-                    Callable<T> runnable = this.queue.take();
-                    this.results[this.numThread] = null;
-                    T result = runnable.call();
-                    this.results[this.numThread] = result;
+                    final JobHolder<T> runnable = this.queue.take();
+                    final Callable<T> job = runnable.getJob();
+                    final int resultBucket = runnable.getResultBucket();
+                    this.results[resultBucket] = null;
+                    final T result = job.call();
+                    this.results[resultBucket] = result;
                     this.latch.decrementAndGet();
                     
                     // Clear potential interrupted state
@@ -66,15 +93,19 @@ public class ThreadPool<T> {
         protected synchronized void setLatch(AtomicInteger latch) {
             this.latch = latch;
         }
+        
+        public void interrupt() {
+            this.self.interrupt();
+        }
     }
     
-    private final BlockingQueue<Callable<T>> queue;
-    private final int                        numThreads;
-    private final PoolThread<T>[]            threads;
-    private final Callable<T>[]              jobs;
-    private volatile Object[]                results;
-    private int                              count;
-                                             
+    private final BlockingQueue<JobHolder<T>> queue;
+    private final int                         numThreads;
+    private final PoolThread<T>[]             threads;
+    private final JobHolder<T>[]              jobs;
+    private volatile Object[]                 results;
+    private int                               count;
+                                              
     /**
      * Create a new thread pool. Main thread acts as worker.
      * @param numThreads
@@ -82,7 +113,7 @@ public class ThreadPool<T> {
     @SuppressWarnings("unchecked")
     public ThreadPool(int numThreads) {
         this.numThreads = numThreads;
-        this.jobs = new Callable[numThreads];
+        this.jobs = new JobHolder[numThreads];
         this.results = new Object[numThreads];
         this.count = 0;
         this.queue = new LinkedBlockingQueue<>();
@@ -90,8 +121,7 @@ public class ThreadPool<T> {
         // Create threads
         this.threads = new PoolThread[numThreads - 1];
         for (int i = 0; i < this.threads.length; i++) {
-            this.threads[i] = new PoolThread<T>((i + 1), this.results, this.queue, Thread.currentThread());
-            this.threads[i].start();
+            this.threads[i] = new PoolThread<T>(this.results, this.queue, Thread.currentThread());
         }
         
     }
@@ -110,15 +140,22 @@ public class ThreadPool<T> {
         
         // Job with index 0 will be given to the main thread
         for (int i = 1; i < this.jobs.length; i++) {
-            this.queue.offer(this.jobs[i]);
+            this.queue.add(this.jobs[i]);
         }
         
         try {
-            this.results[0] = this.jobs[0].call();
+            this.results[this.jobs[0].getResultBucket()] = this.jobs[0].getJob().call();
             latch.decrementAndGet();
         } catch (Exception e) {
             e.printStackTrace();
         }
+        
+//        // Busy wait until all threads finished
+//        while (true) {
+//            if (latch.get() == 0) {
+//                break;
+//            }
+//        }
         
         // Busy wait for first result
         T result = null;
@@ -184,7 +221,7 @@ public class ThreadPool<T> {
         if (this.count > this.numThreads) {
             throw new IllegalArgumentException("You can not submit more jobs than threads.");
         }
-        this.jobs[this.count++] = job;
+        this.jobs[this.count] = new JobHolder<>(job, this.count++);
     }
     
 }
