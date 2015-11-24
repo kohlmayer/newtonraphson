@@ -3,7 +3,6 @@ package de.linearbits.newtonraphson;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.atomic.AtomicInteger;
 
 public class ThreadPool<T> {
     
@@ -40,15 +39,12 @@ public class ThreadPool<T> {
         private final BlockingQueue<JobHolder<T>> queue;
         private boolean                           isClosed;
         private final Object[]                    results;
-        private final Thread                      mainThread;
         private final Thread                      self;
-        private AtomicInteger                     latch;
                                                   
-        public PoolThread(final Object[] results, BlockingQueue<JobHolder<T>> queue, Thread mainThread) {
+        public PoolThread(final Object[] results, final BlockingQueue<JobHolder<T>> queue) {
             this.queue = queue;
             this.isClosed = false;
             this.results = results;
-            this.mainThread = mainThread;
             this.self = new Thread(this);
             this.self.setDaemon(true);
             this.self.start();
@@ -59,6 +55,10 @@ public class ThreadPool<T> {
             this.self.interrupt(); // break pool thread out of take() call.
         }
         
+        public void interrupt() {
+            this.self.interrupt();
+        }
+        
         public synchronized boolean isClosed() {
             return this.isClosed;
         }
@@ -67,35 +67,29 @@ public class ThreadPool<T> {
         public void run() {
             while (!isClosed()) {
                 try {
-                    
                     final JobHolder<T> runnable = this.queue.take();
                     final Callable<T> job = runnable.getJob();
                     final int resultBucket = runnable.getResultBucket();
                     this.results[resultBucket] = null;
                     final T result = job.call();
-                    this.results[resultBucket] = result;
-                    this.latch.decrementAndGet();
-                    
-                    // Clear potential interrupted state
-                    Thread.interrupted();
-                    
-                    // Got result interrupt main thread
-                    if (result != null) {
-                        this.mainThread.interrupt();
-                    }
-                    
+                    ResultHolder<T> rh = new ResultHolder<>(result);
+                    this.results[resultBucket] = rh;
                 } catch (Exception e) {
                     // Do nothing.
                 }
             }
         }
+    }
+    
+    static class ResultHolder<T> {
+        private final T result;
         
-        protected synchronized void setLatch(AtomicInteger latch) {
-            this.latch = latch;
+        public ResultHolder(final T result) {
+            this.result = result;
         }
         
-        public void interrupt() {
-            this.self.interrupt();
+        public T getResult() {
+            return this.result;
         }
     }
     
@@ -103,7 +97,7 @@ public class ThreadPool<T> {
     private final int                         numThreads;
     private final PoolThread<T>[]             threads;
     private final JobHolder<T>[]              jobs;
-    private volatile Object[]                 results;
+    private volatile ResultHolder<T>[]        results;
     private int                               count;
                                               
     /**
@@ -114,28 +108,22 @@ public class ThreadPool<T> {
     public ThreadPool(int numThreads) {
         this.numThreads = numThreads;
         this.jobs = new JobHolder[numThreads];
-        this.results = new Object[numThreads];
+        this.results = new ResultHolder[numThreads];
         this.count = 0;
         this.queue = new LinkedBlockingQueue<>();
         
         // Create threads
         this.threads = new PoolThread[numThreads - 1];
         for (int i = 0; i < this.threads.length; i++) {
-            this.threads[i] = new PoolThread<T>(this.results, this.queue, Thread.currentThread());
+            this.threads[i] = new PoolThread<T>(this.results, this.queue);
         }
         
     }
     
-    @SuppressWarnings("unchecked")
     public T invokeFirstResult() {
         // Clear results
         for (int i = 0; i < this.results.length; i++) {
             this.results[i] = null;
-        }
-        
-        AtomicInteger latch = new AtomicInteger(this.numThreads);
-        for (int i = 0; i < this.threads.length; i++) {
-            this.threads[i].setLatch(latch);
         }
         
         // Job with index 0 will be given to the main thread
@@ -144,37 +132,25 @@ public class ThreadPool<T> {
         }
         
         try {
-            this.results[this.jobs[0].getResultBucket()] = this.jobs[0].getJob().call();
-            latch.decrementAndGet();
+            this.results[this.jobs[0].getResultBucket()] = new ResultHolder<T>(this.jobs[0].getJob().call());
         } catch (Exception e) {
-            e.printStackTrace();
+            // Do nothing.
         }
-        
-//        // Busy wait until all threads finished
-//        while (true) {
-//            if (latch.get() == 0) {
-//                break;
-//            }
-//        }
         
         // Busy wait for first result
         T result = null;
-        outer: while (true) {
-            // If all threads finished only iterate once and exit
-            if (latch.get() == 0) {
-                for (int i = 0; i < this.results.length; i++) {
-                    result = (T) this.results[i];
-                    if (result != null) {
-                        break outer;
-                    }
+        int idx = 0;
+        while (true) {
+            
+            if (this.results[idx] != null) {
+                if (this.results[idx].getResult() != null) {
+                    result = this.results[idx].getResult();
+                    break;
                 }
-                break;
-            } else {
-                for (int i = 0; i < this.results.length; i++) {
-                    result = (T) this.results[i];
-                    if (result != null) {
-                        break outer;
-                    }
+                idx++;
+                // No result found
+                if (idx == this.numThreads) {
+                    break;
                 }
             }
         }
@@ -184,15 +160,16 @@ public class ThreadPool<T> {
             this.threads[i].interrupt();
         }
         
-        // Busy wait until all threads finished
+        // Wait for all threads to finish
+        idx = 0;
         while (true) {
-            if (latch.get() == 0) {
-                break;
+            if (this.results[idx] != null) {
+                idx++;
+                if (idx == this.numThreads) {
+                    break;
+                }
             }
         }
-        
-        // Clear potential interrupted state
-        Thread.interrupted();
         
         // Clear jobs
         for (int i = 0; i < this.jobs.length; i++) {
