@@ -18,9 +18,7 @@ package de.linearbits.newtonraphson;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
-import java.util.concurrent.CompletionService;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -267,8 +265,6 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
         // Further tries are forked
         try {
             
-            CompletionService<Result> executorCompletionService = new ExecutorCompletionService<Result>(this.executor);
-            
             // Are startvalues present
             if (this.preparedStartValues != null) {
                 
@@ -286,7 +282,7 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
                     final int stopIndex = thread == (this.numThreads - 1) ? this.preparedStartValues.length : (thread + 1) * stepping;
                     
                     // Worker thread
-                    this.futures.add(executorCompletionService.submit(new Callable<Result>() {
+                    this.futures.add(executor.submit(new Callable<Result>() {
                         @Override
                         public Result call() throws Exception {
                             return _solveValues(start, NewtonRaphson2DMultithreaded.this.preparedStartValues, iterationsPerThread, startIndex, stopIndex, false);
@@ -301,7 +297,7 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
                 for (int i = 0; i < this.numThreads; i++) {
                     // Execute
                     // Worker thread
-                    this.futures.add(executorCompletionService.submit(new Callable<Result>() {
+                    this.futures.add(executor.submit(new Callable<Result>() {
                         @Override
                         public Result call() throws Exception {
                             return _solveRandom(start, iterationsPerThread, false);
@@ -311,7 +307,7 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
             }
             
             for (int i = 0; i < this.futures.size(); i++) {
-                result = executorCompletionService.take().get();
+                result = futures.get(i).get();
                 totalIterations += result.getIterationsPerTry();
                 totalTries += result.getTriesTotal();
                 
