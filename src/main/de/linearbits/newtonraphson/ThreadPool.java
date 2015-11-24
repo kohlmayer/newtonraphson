@@ -141,7 +141,6 @@ public class ThreadPool<T> {
         T result = null;
         int idx = 0;
         while (true) {
-            
             if (this.results[idx] != null) {
                 if (this.results[idx].getResult() != null) {
                     result = this.results[idx].getResult();
