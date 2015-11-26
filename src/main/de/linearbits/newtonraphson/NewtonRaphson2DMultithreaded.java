@@ -234,7 +234,6 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
     
     private Vector2D _solveMultithreaded(final Vector2D start) {
         
-        final int iterationsPerThread = (((double) this.iterationsTotal / (double) this.numThreads) <= 0) ? 1 : (int) ((double) this.iterationsTotal / (double) this.numThreads);
         final long totalStart = System.currentTimeMillis();
         int totalIterations = 0;
         int totalTries = 0;
@@ -271,6 +270,11 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
                     totalIterations += result.getIterationsPerTry();
                     totalTries += result.getTriesTotal();
                     
+                    // Terminate if total iterations reached
+                    if (totalIterations > this.iterationsTotal) {
+                        break;
+                    }
+                    
                     // Immediate termination or solution found
                     if (result.isTerminate() || (result.getSolution() != null)) {
                         break;
@@ -279,7 +283,7 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
                 
             } else {
                 // Use random guesses
-                
+                final int iterationsPerThread = (((double) this.iterationsTotal / (double) this.numThreads) <= 0) ? 1 : (int) ((double) this.iterationsTotal / (double) this.numThreads);
                 final ExecutorCompletionService<Result> completionService = new ExecutorCompletionService<>(executor);
                 
                 // For each thread
