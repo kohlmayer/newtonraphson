@@ -504,14 +504,6 @@ public class NewtonRaphson2D extends NewtonRaphsonConfiguration<NewtonRaphson2D>
             object.times(derivatives);
             solution.minus(object);
             
-            // Check constraints
-            if (constraints != null) {
-                for (final Constraint2D constraint : constraints) {
-                    if (!constraint.evaluate(solution)) {
-                        return new Result(false, totalIterations, startPerTry);
-                    }
-                }
-            }
             
             // Error or constraint reached
             final long time = System.currentTimeMillis();
@@ -519,6 +511,15 @@ public class NewtonRaphson2D extends NewtonRaphsonConfiguration<NewtonRaphson2D>
                 (iterations++ >= iterationsPerTry) ||
                 ((time - startPerTry) > timePerTry)) {
                 return new Result(false, totalIterations, startPerTry);
+            }
+            
+            // Check constraints
+            if (constraints != null) {
+                for (final Constraint2D constraint : constraints) {
+                    if (!constraint.evaluate(solution)) {
+                        return new Result(false, totalIterations, startPerTry);
+                    }
+                }
             }
             
             // Timing limit
