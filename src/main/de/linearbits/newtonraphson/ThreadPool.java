@@ -109,6 +109,11 @@ public class ThreadPool<T> {
         this.numThreads = numThreads;
         this.jobs = new JobHolder[numThreads];
         this.results = new ResultHolder[numThreads];
+        // Fill initially
+        for (int i = 0; i < results.length; i++) {
+            results[i] = new ResultHolder<>(null);
+        }
+        
         this.count = 0;
         this.queue = new LinkedBlockingQueue<>();
         
@@ -121,9 +126,14 @@ public class ThreadPool<T> {
     }
     
     public T invokeFirstResult() {
-        // Clear results
-        for (int i = 0; i < this.results.length; i++) {
-            this.results[i] = null;
+        
+        // Wait for all threads to finish and clear results
+        int idx = 0;
+        while (idx != this.numThreads) {
+            if (this.results[idx] != null) {
+                this.results[idx] = null;
+                idx++;
+            }
         }
         
         // Job with index 0 will be given to the main thread
@@ -139,35 +149,20 @@ public class ThreadPool<T> {
         
         // Busy wait for first result
         T result = null;
-        int idx = 0;
-        while (true) {
+        idx = 0;
+        while (idx != this.numThreads) {
             if (this.results[idx] != null) {
                 if (this.results[idx].getResult() != null) {
                     result = this.results[idx].getResult();
                     break;
                 }
                 idx++;
-                // No result found
-                if (idx == this.numThreads) {
-                    break;
-                }
             }
         }
         
         // Interrupt all threads
         for (int i = 0; i < this.threads.length; i++) {
             this.threads[i].interrupt();
-        }
-        
-        // Wait for all threads to finish
-        idx = 0;
-        while (true) {
-            if (this.results[idx] != null) {
-                idx++;
-                if (idx == this.numThreads) {
-                    break;
-                }
-            }
         }
         
         // Clear jobs
