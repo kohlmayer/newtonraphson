@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -237,30 +238,7 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
         final long totalStart = System.currentTimeMillis();
         int totalIterations = 0;
         int totalTries = 0;
-        
-        // Try start value in main thread
-        Result result = _try(start, totalStart);
-        totalIterations += result.getIterationsPerTry();
-        
-        if (result.isTerminate()) { // Immediate termination
-            result.setTriesTotal(1);
-            result.setTimeTotal((int) (System.currentTimeMillis() - totalStart));
-            result.setIterationsTotal(totalIterations);
-            this.measures = new NewtonRaphsonMeasures(result.getIterationsTotal(),
-                                                      result.getTriesTotal(),
-                                                      result.getTimeTotal(),
-                                                      0d);
-            return new Vector2D(Double.NaN, Double.NaN);
-        } else if (result.getSolution() != null) { // Solution found
-            result.setTriesTotal(1);
-            result.setTimeTotal((int) (System.currentTimeMillis() - totalStart));
-            result.setIterationsTotal(totalIterations);
-            this.measures = new NewtonRaphsonMeasures(result.getIterationsTotal(),
-                                                      result.getTriesTotal(),
-                                                      result.getTimeTotal(),
-                                                      result.getQuality());
-            return result.getSolution();
-        }
+        Result result = null;
         
         // Further tries are forked
         try {
@@ -268,54 +246,69 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
             // Are startvalues present
             if (this.preparedStartValues != null) {
                 
-                int stepping = (int) ((double) this.preparedStartValues.length / (double) this.numThreads);
-                if (stepping <= 0) {
-                    stepping = 1;
-                }
+                // Add start value
+                this.futures.add(executor.submit(new Callable<Result>() {
+                    @Override
+                    public Result call() throws Exception {
+                        return _try(start, totalStart);
+                    }
+                }));
                 
-                // For each thread
-                for (int i = 0; i < this.numThreads; i++) {
-                    
-                    // Execute
-                    final int thread = i;
-                    final int startIndex = thread * stepping;
-                    final int stopIndex = thread == (this.numThreads - 1) ? this.preparedStartValues.length : (thread + 1) * stepping;
-                    
-                    // Worker thread
+                // For all other start values add jobs
+                for (int i = 0; i < this.preparedStartValues.length; i++) {
+                    final Vector2D startValue = new Vector2D(preparedStartValues[i][0], preparedStartValues[i][1]);
                     this.futures.add(executor.submit(new Callable<Result>() {
                         @Override
                         public Result call() throws Exception {
-                            return _solveValues(start, NewtonRaphson2DMultithreaded.this.preparedStartValues, iterationsPerThread, startIndex, stopIndex, false);
+                            return _try(startValue, totalStart);
                         }
                     }));
+                }
+                
+                // Get results in order
+                for (int i = 0; i < this.futures.size(); i++) {
+                    result = futures.get(i).get();
+                    totalIterations += result.getIterationsPerTry();
+                    totalTries += result.getTriesTotal();
+                    
+                    // Immediate termination or solution found
+                    if (result.isTerminate() || (result.getSolution() != null)) {
+                        break;
+                    }
                 }
                 
             } else {
                 // Use random guesses
                 
+                final ExecutorCompletionService<Result> completionService = new ExecutorCompletionService<>(executor);
+                
                 // For each thread
                 for (int i = 0; i < this.numThreads; i++) {
                     // Execute
+                    final int thread = i;
                     // Worker thread
-                    this.futures.add(executor.submit(new Callable<Result>() {
+                    this.futures.add(completionService.submit(new Callable<Result>() {
                         @Override
                         public Result call() throws Exception {
-                            return _solveRandom(start, iterationsPerThread, false);
+                            return _solveRandom(start, iterationsPerThread, (thread == 0) ? true : false);
                         }
                     }));
                 }
+                
+                // Get first available result
+                for (int i = 0; i < this.futures.size(); i++) {
+                    result = completionService.take().get();
+                    totalIterations += result.getIterationsPerTry();
+                    totalTries += result.getTriesTotal();
+                    
+                    // Immediate termination or solution found
+                    if (result.isTerminate() || (result.getSolution() != null)) {
+                        break;
+                    }
+                }
+                
             }
             
-            for (int i = 0; i < this.futures.size(); i++) {
-                result = futures.get(i).get();
-                totalIterations += result.getIterationsPerTry();
-                totalTries += result.getTriesTotal();
-                
-                // Immediate termination or solution found
-                if (result.isTerminate() || (result.getSolution() != null)) {
-                    break;
-                }
-            }
             result.setTriesTotal(totalTries);
             result.setTimeTotal((int) (System.currentTimeMillis() - totalStart));
             result.setIterationsTotal(totalIterations);
