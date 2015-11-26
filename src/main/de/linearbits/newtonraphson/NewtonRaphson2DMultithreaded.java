@@ -268,7 +268,7 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
                 for (int i = 0; i < this.futures.size(); i++) {
                     result = futures.get(i).get();
                     totalIterations += result.getIterationsPerTry();
-                    totalTries += result.getTriesTotal();
+                    totalTries++;
                     
                     // Terminate if total iterations reached
                     if (totalIterations > this.iterationsTotal) {
