@@ -23,7 +23,7 @@ package de.linearbits.newtonraphson;
  */
 public class NewtonRaphson2D extends NewtonRaphsonConfiguration<NewtonRaphson2D> {
     
-    class Result {
+   public class Result {
         private final boolean  terminate;
         private final Vector2D solution;
         private final double   quality;
