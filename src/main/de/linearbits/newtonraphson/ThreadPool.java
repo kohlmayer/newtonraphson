@@ -30,6 +30,18 @@ public class ThreadPool {
         private final ReentrantLock      lock;
         private int                      maxIterations;
                                          
+        /**
+         * Creates a new thread.
+         * @param jobs
+         * @param results
+         * @param nextJob
+         * @param lock
+         * @param condition
+         * @param mainThread
+         * @param poolHolder
+         * @param threads
+         * @param totalIterations
+         */
         public PoolThread(final Callable<Result>[] jobs, final ResultHolder[] results, final AtomicInteger nextJob, final ReentrantLock lock, final Condition condition, final Thread mainThread, final ThreadPool poolHolder, final PoolThread[] threads, final AtomicInteger totalIterations) {
             this.isWorking = true;
             this.jobs = jobs;
@@ -48,23 +60,41 @@ public class ThreadPool {
             this.self.start();
         }
         
+        /**
+         * Shutdown the thread.
+         */
         public synchronized void close() {
             this.isClosed = true;
             this.self.interrupt();
         }
         
+        /**
+         * Gets the id of the currently processed job.
+         * @return
+         */
         public int getCurrentIdx() {
             return this.currentIdx;
         }
         
+        /**
+         * Interrupts this thread.
+         */
         public void interrupt() {
             this.self.interrupt();
         }
         
+        /**
+         * Returns true if the thread is shutdown.
+         * @return
+         */
         public synchronized boolean isClosed() {
             return this.isClosed;
         }
         
+        /**
+         * Is the thread working?
+         * @return
+         */
         public synchronized boolean isWorking() {
             return this.isWorking;
         }
@@ -123,6 +153,10 @@ public class ThreadPool {
             }
         }
         
+        /**
+         * Sets the allowed maximal number of iteraitons.
+         * @param maxIterations
+         */
         public synchronized void setMaxIterations(int maxIterations) {
             this.maxIterations = maxIterations;
         }
@@ -163,6 +197,7 @@ public class ThreadPool {
     /**
      * Create a new thread pool. Main thread acts as worker.
      * @param numThreads
+     * @param numJobs
      */
     @SuppressWarnings("unchecked")
     public ThreadPool(int numThreads, int numJobs) {
@@ -186,10 +221,18 @@ public class ThreadPool {
         
     }
     
+    /**
+     * Returns the total number of iterations.
+     * @return
+     */
     public int getTotalIterations() {
         return this.totalIterations.get();
     }
     
+    /**
+     * Returns the number of tries.
+     * @return
+     */
     public int getTotalTries() {
         return this.totalTries;
     }
@@ -304,7 +347,7 @@ public class ThreadPool {
     }
     
     /**
-     * Returns the index of the currently processed thread.
+     * Returns the index of the currently processed job.
      * @return
      */
     private int getCurrentIdx() {
