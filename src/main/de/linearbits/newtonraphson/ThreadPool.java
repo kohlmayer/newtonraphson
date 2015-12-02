@@ -10,51 +10,27 @@ import de.linearbits.newtonraphson.NewtonRaphson2D.Result;
 public class ThreadPool {
     
     /**
-     * Helper class wrapping a callable and an assigned result bucket.
-     * TODO: Remove.
-     */
-    static class JobHolder {
-        
-        private final Callable<Result> job;
-        private final int              resultBucket;
-                                       
-        public JobHolder(Callable<Result> job, int resultBucket) {
-            this.job = job;
-            this.resultBucket = resultBucket;
-        }
-        
-        public Callable<Result> getJob() {
-            return this.job;
-        }
-        
-        public int getResultBucket() {
-            return this.resultBucket;
-        }
-        
-    }
-    
-    /**
      * Class wrapping the thread object.
      */
     static class PoolThread implements Runnable {
         
-        private final JobHolder[]    jobs;
-        private boolean              isClosed;
-        private boolean              isWorking;
-        private final ResultHolder[] results;
-        private final Thread         self;
-        private final AtomicInteger  nextJob;
-        private final Thread         mainThread;
-        private final ThreadPool     poolHolder;
-        private volatile int         currentIdx;
-        private final PoolThread[]   threads;
-        private final AtomicInteger  totalIterations;
-                                     
-        private final Condition      condition;
-        private final ReentrantLock  lock;
-        private int                  maxIterations;
-                                     
-        public PoolThread(final JobHolder[] jobs, final ResultHolder[] results, final AtomicInteger nextJob, final ReentrantLock lock, final Condition condition, final Thread mainThread, final ThreadPool poolHolder, final PoolThread[] threads, final AtomicInteger totalIterations) {
+        private final Callable<Result>[] jobs;
+        private boolean                  isClosed;
+        private boolean                  isWorking;
+        private final ResultHolder[]     results;
+        private final Thread             self;
+        private final AtomicInteger      nextJob;
+        private final Thread             mainThread;
+        private final ThreadPool         poolHolder;
+        private volatile int             currentIdx;
+        private final PoolThread[]       threads;
+        private final AtomicInteger      totalIterations;
+                                         
+        private final Condition          condition;
+        private final ReentrantLock      lock;
+        private int                      maxIterations;
+                                         
+        public PoolThread(final Callable<Result>[] jobs, final ResultHolder[] results, final AtomicInteger nextJob, final ReentrantLock lock, final Condition condition, final Thread mainThread, final ThreadPool poolHolder, final PoolThread[] threads, final AtomicInteger totalIterations) {
             this.isWorking = true;
             this.jobs = jobs;
             this.isClosed = false;
@@ -111,8 +87,7 @@ public class ThreadPool {
                 // Start working
                 try {
                     while ((this.currentIdx = this.nextJob.getAndIncrement()) < this.jobs.length) {
-                        final JobHolder jobHolder = this.jobs[this.currentIdx];
-                        final Callable<Result> job = jobHolder.getJob();
+                        final Callable<Result> job = this.jobs[this.currentIdx];
                         final Result result = job.call();
                         final ResultHolder rh = new ResultHolder(result);
                         this.results[this.currentIdx] = rh;
@@ -171,27 +146,28 @@ public class ThreadPool {
         }
     }
     
-    private final int            numJobs;
-    private int                  idx;
-    private final PoolThread[]   threads;
-    private final Thread         mainThread;
-    private final JobHolder[]    jobs;
-    private final ResultHolder[] results;
-    private final Condition      condition;
-    private final ReentrantLock  lock;
-                                 
-    private final AtomicInteger  nextJob;
-    private volatile int         mainThreadIdx;
-    private final AtomicInteger  totalIterations;
-    private int                  totalTries;
-                                 
+    private final int                numJobs;
+    private int                      idx;
+    private final PoolThread[]       threads;
+    private final Thread             mainThread;
+    private final Callable<Result>[] jobs;
+    private final ResultHolder[]     results;
+    private final Condition          condition;
+    private final ReentrantLock      lock;
+                                     
+    private final AtomicInteger      nextJob;
+    private volatile int             mainThreadIdx;
+    private final AtomicInteger      totalIterations;
+    private int                      totalTries;
+                                     
     /**
      * Create a new thread pool. Main thread acts as worker.
      * @param numThreads
      */
+    @SuppressWarnings("unchecked")
     public ThreadPool(int numThreads, int numJobs) {
         this.numJobs = numJobs;
-        this.jobs = new JobHolder[numJobs];
+        this.jobs = new Callable[numJobs];
         this.results = new ResultHolder[numJobs];
         this.mainThread = Thread.currentThread();
         
@@ -243,9 +219,7 @@ public class ThreadPool {
         // Start working
         try {
             while ((this.mainThreadIdx = this.nextJob.getAndIncrement()) < this.jobs.length) {
-                
-                final JobHolder jobHolder = this.jobs[this.mainThreadIdx];
-                final Callable<Result> job = jobHolder.getJob();
+                final Callable<Result> job = this.jobs[this.mainThreadIdx];
                 final Result result = job.call();
                 final ResultHolder rh = new ResultHolder(result);
                 this.results[this.mainThreadIdx] = rh;
@@ -325,7 +299,7 @@ public class ThreadPool {
         if (this.idx > this.numJobs) {
             throw new IllegalArgumentException("You can not submit more jobs than specified.");
         }
-        this.jobs[this.idx] = new JobHolder(job, this.idx);
+        this.jobs[this.idx] = job;
         this.idx++;
     }
     
