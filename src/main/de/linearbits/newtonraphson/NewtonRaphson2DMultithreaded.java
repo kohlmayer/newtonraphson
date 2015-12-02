@@ -18,7 +18,7 @@ package de.linearbits.newtonraphson;
 import java.util.concurrent.Callable;
 
 /**
- * The class implements a multithreadeed version of the Newton-Raphson algorithm
+ * The class implements a multithreaded version of the Newton-Raphson algorithm
  * 
  * @author Florian Kohlmayer
  */
@@ -26,34 +26,13 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
     
     /** SVUID */
     private static final long serialVersionUID = -7468092557502640336L;
-    
-    /**
-     * Helper method to create a ThreadPool<Result>. The returned value can be provided to the constructor.
-     * @param numThreads
-     * @return
-     */
-    public static final ThreadPool createPool(final int numThreads) {
-        // final ThreadPool<Result> executor = Executors.newFixedThreadPool(numThreads, new ThreadFactory() {
-        // int count = 0;
-        //
-        // @Override
-        // public Thread newThread(final Runnable r) {
-        // final Thread thread = new Thread(r);
-        // thread.setDaemon(true);
-        // thread.setName("NewtonRaphson Solver " + this.count++);
-        // return thread;
-        // }
-        // });
-        ThreadPool executor = new ThreadPool(numThreads, 17);
-        return executor;
-    }
-    
+                                               
     /** The number of threads */
-    private int                numThreads;
-                               
+    private int               numThreads;
+                              
     /** The executor */
-    private ThreadPool executor;
-                               
+    private ThreadPool        executor;
+                              
     /**
      * Creates a new instance
      * @param function
@@ -232,6 +211,7 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
         // Further tries are forked
         
         // Are startvalues present
+        // TODO: implement random start values!
         
         // Add start value
         executor.submit(new Callable<Result>() {
@@ -253,9 +233,9 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
         }
         
         // Get result
-        result = executor.invokeFirstResult();
-        totalIterations += result.getIterationsPerTry();
-        totalTries++;
+        result = executor.invokeFirstResult(iterationsTotal);
+        totalIterations = executor.getTotalIterations();
+        totalTries = executor.getTotalTries();
         
         result.setTriesTotal(totalTries);
         result.setTimeTotal((int) (System.currentTimeMillis() - totalStart));
