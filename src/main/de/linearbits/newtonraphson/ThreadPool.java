@@ -14,21 +14,21 @@ public class ThreadPool {
      */
     static class PoolThread implements Runnable {
         
-        private final Callable<Result>[] jobs;
+        private final Condition          condition;
+        private volatile int             currentIdx;
         private boolean                  isClosed;
         private boolean                  isWorking;
-        private final ResultHolder[]     results;
-        private final Thread             self;
-        private final AtomicInteger      nextJob;
+        private final Callable<Result>[] jobs;
+        private final ReentrantLock      lock;
         private final Thread             mainThread;
+        private int                      maxIterations;
+        private final AtomicInteger      nextJob;
         private final ThreadPool         poolHolder;
-        private volatile int             currentIdx;
+        private final ResultHolder[]     results;
+                                         
+        private final Thread             self;
         private final PoolThread[]       threads;
         private final AtomicInteger      totalIterations;
-                                         
-        private final Condition          condition;
-        private final ReentrantLock      lock;
-        private int                      maxIterations;
                                          
         /**
          * Creates a new thread.
@@ -180,17 +180,17 @@ public class ThreadPool {
         }
     }
     
-    private final int                numJobs;
-    private int                      idx;
-    private final PoolThread[]       threads;
-    private final Thread             mainThread;
-    private final Callable<Result>[] jobs;
-    private final ResultHolder[]     results;
     private final Condition          condition;
+    private int                      idx;
+    private final Callable<Result>[] jobs;
     private final ReentrantLock      lock;
-                                     
-    private final AtomicInteger      nextJob;
+    private final Thread             mainThread;
     private volatile int             mainThreadIdx;
+    private final AtomicInteger      nextJob;
+    private final int                numJobs;
+                                     
+    private final ResultHolder[]     results;
+    private final PoolThread[]       threads;
     private final AtomicInteger      totalIterations;
     private int                      totalTries;
                                      
