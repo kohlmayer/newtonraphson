@@ -32,7 +32,7 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
      * @param numThreads
      * @return
      */
-    public static final ThreadPool<Result> createPool(final int numThreads) {
+    public static final ThreadPool createPool(final int numThreads) {
         // final ThreadPool<Result> executor = Executors.newFixedThreadPool(numThreads, new ThreadFactory() {
         // int count = 0;
         //
@@ -44,7 +44,7 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
         // return thread;
         // }
         // });
-        ThreadPool<Result> executor = new ThreadPool<>(numThreads, 17);
+        ThreadPool executor = new ThreadPool(numThreads, 17);
         return executor;
     }
     
@@ -52,13 +52,13 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
     private int                numThreads;
                                
     /** The executor */
-    private ThreadPool<Result> executor;
+    private ThreadPool executor;
                                
     /**
      * Creates a new instance
      * @param function
      */
-    public NewtonRaphson2DMultithreaded(final ThreadPool<Result> executor, final int numThreads, final Function<Vector2D, Pair<Vector2D, SquareMatrix2D>> function) {
+    public NewtonRaphson2DMultithreaded(final ThreadPool executor, final int numThreads, final Function<Vector2D, Pair<Vector2D, SquareMatrix2D>> function) {
         super(function);
         init(executor, numThreads);
     }
@@ -68,7 +68,7 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
      * @param function
      * @param constraints
      */
-    public NewtonRaphson2DMultithreaded(final ThreadPool<Result> executor,
+    public NewtonRaphson2DMultithreaded(final ThreadPool executor,
                                         final int numThreads,
                                         final Function<Vector2D, Pair<Vector2D, SquareMatrix2D>> function,
                                         final Constraint2D... constraints) {
@@ -81,7 +81,7 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
      * @param functions
      * @param derivatives
      */
-    public NewtonRaphson2DMultithreaded(final ThreadPool<Result> executor,
+    public NewtonRaphson2DMultithreaded(final ThreadPool executor,
                                         final int numThreads,
                                         final Function<Vector2D, Vector2D> functions,
                                         final Function<Vector2D, SquareMatrix2D> derivatives) {
@@ -95,7 +95,7 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
      * @param derivatives
      * @param constraints
      */
-    public NewtonRaphson2DMultithreaded(final ThreadPool<Result> executor,
+    public NewtonRaphson2DMultithreaded(final ThreadPool executor,
                                         final int numThreads,
                                         final Function<Vector2D, Vector2D> functions,
                                         final Function<Vector2D, SquareMatrix2D> derivatives,
@@ -109,7 +109,7 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
      * @param function1
      * @param function2
      */
-    public NewtonRaphson2DMultithreaded(final ThreadPool<Result> executor,
+    public NewtonRaphson2DMultithreaded(final ThreadPool executor,
                                         final int numThreads,
                                         final Function2D function1,
                                         final Function2D function2) {
@@ -123,7 +123,7 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
      * @param derivatives
      * @param constraints
      */
-    public NewtonRaphson2DMultithreaded(final ThreadPool<Result> executor,
+    public NewtonRaphson2DMultithreaded(final ThreadPool executor,
                                         final int numThreads,
                                         final Function2D functions,
                                         final Function2D derivatives,
@@ -138,7 +138,7 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
      * @param function2
      * @param derivatives
      */
-    public NewtonRaphson2DMultithreaded(final ThreadPool<Result> executor,
+    public NewtonRaphson2DMultithreaded(final ThreadPool executor,
                                         final int numThreads,
                                         final Function2D function1,
                                         final Function2D function2,
@@ -154,7 +154,7 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
      * @param derivatives
      * @param constraints
      */
-    public NewtonRaphson2DMultithreaded(final ThreadPool<Result> executor,
+    public NewtonRaphson2DMultithreaded(final ThreadPool executor,
                                         final int numThreads,
                                         final Function2D function1,
                                         final Function2D function2,
@@ -173,7 +173,7 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
      * @param derivative21
      * @param derivative22
      */
-    public NewtonRaphson2DMultithreaded(final ThreadPool<Result> executor,
+    public NewtonRaphson2DMultithreaded(final ThreadPool executor,
                                         final int numThreads,
                                         final Function2D function1,
                                         final Function2D function2,
@@ -195,7 +195,7 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
      * @param derivative22
      * @param constraints
      */
-    public NewtonRaphson2DMultithreaded(final ThreadPool<Result> executor,
+    public NewtonRaphson2DMultithreaded(final ThreadPool executor,
                                         final int numThreads,
                                         final Function2D function1,
                                         final Function2D function2,
@@ -283,7 +283,7 @@ public class NewtonRaphson2DMultithreaded extends NewtonRaphson2D {
      * @param executor
      * @param numThreads
      */
-    private void init(final ThreadPool<Result> executor, final int numThreads) {
+    private void init(final ThreadPool executor, final int numThreads) {
         this.numThreads = numThreads;
         this.executor = executor;
     }

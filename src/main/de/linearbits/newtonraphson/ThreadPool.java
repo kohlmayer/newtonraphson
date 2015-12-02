@@ -7,23 +7,23 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import de.linearbits.newtonraphson.NewtonRaphson2D.Result;
 
-public class ThreadPool<T extends Result> {
+public class ThreadPool {
     
     /**
-     * Class wrapping a callable and an assigned result bucket.
-     * @param <T>
+     * Helper class wrapping a callable and an assigned result bucket.
+     * TODO: Remove.
      */
-    static class JobHolder<T extends Result> {
+    static class JobHolder {
         
-        private final Callable<T> job;
-        private final int         resultBucket;
-                                  
-        public JobHolder(Callable<T> job, int resultBucket) {
+        private final Callable<Result> job;
+        private final int              resultBucket;
+                                       
+        public JobHolder(Callable<Result> job, int resultBucket) {
             this.job = job;
             this.resultBucket = resultBucket;
         }
         
-        public Callable<T> getJob() {
+        public Callable<Result> getJob() {
             return this.job;
         }
         
@@ -35,25 +35,24 @@ public class ThreadPool<T extends Result> {
     
     /**
      * Class wrapping the thread object.
-     * @param <T>
      */
-    static class PoolThread<T extends Result> implements Runnable {
+    static class PoolThread implements Runnable {
         
-        private final JobHolder<T>[]    jobs;
-        private boolean                 isClosed;
-        private boolean                 isWorking;
-        private final ResultHolder<T>[] results;
-        private final Thread            self;
-        private final AtomicInteger     nextJob;
-        private final Thread            mainThread;
-        private final ThreadPool<T>     poolHolder;
-        private volatile int            currentIdx;
-        private final PoolThread<T>[]   threads;
-                                        
-        private final Condition         condition;
-        private final ReentrantLock     lock;
-                                        
-        public PoolThread(final JobHolder<T>[] jobs, final ResultHolder<T>[] results, final AtomicInteger nextJob, final ReentrantLock lock, final Condition condition, final Thread mainThread, final ThreadPool<T> poolHolder, final PoolThread<T>[] threads) {
+        private final JobHolder[]    jobs;
+        private boolean              isClosed;
+        private boolean              isWorking;
+        private final ResultHolder[] results;
+        private final Thread         self;
+        private final AtomicInteger  nextJob;
+        private final Thread         mainThread;
+        private final ThreadPool     poolHolder;
+        private volatile int         currentIdx;
+        private final PoolThread[]   threads;
+                                     
+        private final Condition      condition;
+        private final ReentrantLock  lock;
+                                     
+        public PoolThread(final JobHolder[] jobs, final ResultHolder[] results, final AtomicInteger nextJob, final ReentrantLock lock, final Condition condition, final Thread mainThread, final ThreadPool poolHolder, final PoolThread[] threads) {
             this.isWorking = true;
             this.jobs = jobs;
             this.isClosed = false;
@@ -109,10 +108,10 @@ public class ThreadPool<T extends Result> {
                     
                     // Start working
                     while ((this.currentIdx = this.nextJob.getAndIncrement()) < this.jobs.length) {
-                        final JobHolder<T> jobHolder = this.jobs[this.currentIdx];
-                        final Callable<T> job = jobHolder.getJob();
-                        final T result = job.call();
-                        final ResultHolder<T> rh = new ResultHolder<>(result);
+                        final JobHolder jobHolder = this.jobs[this.currentIdx];
+                        final Callable<Result> job = jobHolder.getJob();
+                        final Result result = job.call();
+                        final ResultHolder rh = new ResultHolder(result);
                         this.results[this.currentIdx] = rh;
                         
                         // I've found a result. No other job has to be calculated.
@@ -141,35 +140,40 @@ public class ThreadPool<T extends Result> {
         }
     }
     
-    static class ResultHolder<T extends Result> {
-        private final T result;
+    /**
+     * Helper class holding the result.
+     * TODO: Remove
+     * @author kohlmayer
+     *         
+     */
+    static class ResultHolder {
+        private final Result result;
         
-        public ResultHolder(final T result) {
+        public ResultHolder(final Result result) {
             this.result = result;
         }
         
-        public T getResult() {
+        public Result getResult() {
             return this.result;
         }
     }
     
-    private final int               numJobs;
-    private int                     idx;
-    private final PoolThread<T>[]   threads;
-    private final Thread            mainThread;
-    private final JobHolder<T>[]    jobs;
-    private final ResultHolder<T>[] results;
-    private final Condition         condition;
-    private final ReentrantLock     lock;
-                                    
-    private final AtomicInteger     nextJob;
-    private volatile int            mainThreadIdx;
-                                    
+    private final int            numJobs;
+    private int                  idx;
+    private final PoolThread[]   threads;
+    private final Thread         mainThread;
+    private final JobHolder[]    jobs;
+    private final ResultHolder[] results;
+    private final Condition      condition;
+    private final ReentrantLock  lock;
+                                 
+    private final AtomicInteger  nextJob;
+    private volatile int         mainThreadIdx;
+                                 
     /**
      * Create a new thread pool. Main thread acts as worker.
      * @param numThreads
      */
-    @SuppressWarnings("unchecked")
     public ThreadPool(int numThreads, int numJobs) {
         this.numJobs = numJobs;
         this.jobs = new JobHolder[numJobs];
@@ -185,7 +189,7 @@ public class ThreadPool<T extends Result> {
         // Create threads. Main thread is also considered to be a thread.
         this.threads = new PoolThread[numThreads - 1];
         for (int i = 0; i < this.threads.length; i++) {
-            this.threads[i] = new PoolThread<T>(this.jobs, this.results, this.nextJob, this.lock, this.condition, this.mainThread, this, this.threads);
+            this.threads[i] = new PoolThread(this.jobs, this.results, this.nextJob, this.lock, this.condition, this.mainThread, this, this.threads);
         }
         
     }
@@ -194,7 +198,7 @@ public class ThreadPool<T extends Result> {
      * Start all threads and returns the first found result.
      * @return
      */
-    public T invokeFirstResult() {
+    public Result invokeFirstResult() {
         this.nextJob.set(0);
         
         // Wake all threads
@@ -210,15 +214,15 @@ public class ThreadPool<T extends Result> {
             
             // TODO: check if totalIterations are reached --> use atomicInteger
             
-            final JobHolder<T> jobHolder = this.jobs[this.mainThreadIdx];
-            final Callable<T> job = jobHolder.getJob();
-            T result = null;
+            final JobHolder jobHolder = this.jobs[this.mainThreadIdx];
+            final Callable<Result> job = jobHolder.getJob();
+            Result result = null;
             try {
                 result = job.call();
             } catch (Exception e) {
                 // Do nothing.
             }
-            final ResultHolder<T> rh = new ResultHolder<>(result);
+            final ResultHolder rh = new ResultHolder(result);
             this.results[this.mainThreadIdx] = rh;
             
             // I've found a result. No other job has to be calculated.
@@ -245,7 +249,7 @@ public class ThreadPool<T extends Result> {
         Thread.interrupted();
         
         // Check if result is available
-        T result = (this.results[0] != null) ? this.results[0].getResult() : null;
+        Result result = (this.results[0] != null) ? this.results[0].getResult() : null;
         for (int i = 0; i < this.results.length; i++) {
             if ((this.results[i] != null) && (this.results[i].getResult().getSolution() != null)) { // result found.
                 result = this.results[i].getResult();
@@ -276,11 +280,11 @@ public class ThreadPool<T extends Result> {
      * Submits a new job into the queue. Execution start with invoke methods. Callables have to return null if no solution found.
      * @param job
      */
-    public void submit(Callable<T> job) {
+    public void submit(Callable<Result> job) {
         if (this.idx > this.numJobs) {
             throw new IllegalArgumentException("You can not submit more jobs than specified.");
         }
-        this.jobs[this.idx] = new JobHolder<>(job, this.idx);
+        this.jobs[this.idx] = new JobHolder(job, this.idx);
         this.idx++;
     }
     
