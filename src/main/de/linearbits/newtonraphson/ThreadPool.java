@@ -143,7 +143,7 @@ public class ThreadPool {
                         }
                         // Total number of iterations reached
                         if (this.totalIterations.get() > this.maxIterations) {
-                            break;
+                            this.nextJob.set(this.jobs.length);
                         }
                         
                     }
@@ -154,7 +154,7 @@ public class ThreadPool {
         }
         
         /**
-         * Sets the allowed maximal number of iteraitons.
+         * Sets the allowed maximal number of iterations.
          * @param maxIterations
          */
         public synchronized void setMaxIterations(int maxIterations) {
@@ -282,7 +282,7 @@ public class ThreadPool {
                 
                 // Total number of iterations reached
                 if (this.totalIterations.get() > maxIterations) {
-                    break;
+                    this.nextJob.set(this.jobs.length);
                 }
                 
             }
