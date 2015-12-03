@@ -12,24 +12,14 @@ public class ThreadPool {
     /**
      * Class wrapping the thread object.
      */
-    static class PoolThread implements Runnable {
+    class PoolThread implements Runnable {
         
-        private final Condition          condition;
-        private volatile int             currentIdx;
-        private boolean                  isClosed;
-        private boolean                  isWorking;
-        private final Callable<Result>[] jobs;
-        private final ReentrantLock      lock;
-        private final Thread             mainThread;
-        private int                      maxIterations;
-        private final AtomicInteger      nextJob;
-        private final ThreadPool         poolHolder;
-        private final ResultHolder[]     results;
-                                         
-        private final Thread             self;
-        private final PoolThread[]       threads;
-        private final AtomicInteger      totalIterations;
-                                         
+        private volatile int     currentIdx;
+        private boolean          isClosed;
+        private boolean          isWorking;
+        private final ThreadPool poolHolder;
+        private final Thread     self;
+                                 
         /**
          * Creates a new thread.
          * @param jobs
@@ -42,19 +32,11 @@ public class ThreadPool {
          * @param threads
          * @param totalIterations
          */
-        public PoolThread(final Callable<Result>[] jobs, final ResultHolder[] results, final AtomicInteger nextJob, final ReentrantLock lock, final Condition condition, final Thread mainThread, final ThreadPool poolHolder, final PoolThread[] threads, final AtomicInteger totalIterations) {
+        public PoolThread(final ThreadPool poolHolder) {
             this.isWorking = true;
-            this.jobs = jobs;
             this.isClosed = false;
-            this.results = results;
-            this.nextJob = nextJob;
-            this.mainThread = mainThread;
             this.poolHolder = poolHolder;
-            this.threads = threads;
             this.currentIdx = 0;
-            this.lock = lock;
-            this.condition = condition;
-            this.totalIterations = totalIterations;
             this.self = new Thread(this);
             this.self.setDaemon(true);
             this.self.start();
@@ -103,47 +85,45 @@ public class ThreadPool {
         public void run() {
             while (!isClosed()) {
                 // Wait
-                this.lock.lock();
+                ThreadPool.this.lock.lock();
                 try {
                     this.isWorking = false;
-                    this.condition.await();
+                    ThreadPool.this.condition.await();
                 } catch (InterruptedException e) {
                     // Do nothing
                 } finally {
                     this.isWorking = true;
-                    this.lock.unlock();
+                    ThreadPool.this.lock.unlock();
                 }
                 
                 // Start working
                 try {
-                    while ((this.currentIdx = this.nextJob.getAndIncrement()) < this.jobs.length) {
-                        final Callable<Result> job = this.jobs[this.currentIdx];
+                    while ((this.currentIdx = ThreadPool.this.nextJob.getAndIncrement()) < ThreadPool.this.jobs.length) {
+                        final Callable<Result> job = ThreadPool.this.jobs[this.currentIdx];
                         final Result result = job.call();
-                        final ResultHolder rh = new ResultHolder(result);
-                        this.results[this.currentIdx] = rh;
-                        this.totalIterations.addAndGet(rh.getResult().getIterationsPerTry());
+                        ThreadPool.this.results[this.currentIdx] = result;
                         
                         // I've found a result. No other job has to be calculated.
-                        if (rh.getResult().getSolution() != null) {
-                            this.nextJob.set(this.jobs.length);
+                        if (result.getSolution() != null) {
+                            ThreadPool.this.nextJob.set(ThreadPool.this.jobs.length);
                             
                             // Interrupt main thread if it calculates a later start value
                             if (this.poolHolder.getCurrentIdx() > this.currentIdx) {
-                                this.mainThread.interrupt();
+                                ThreadPool.this.mainThread.interrupt();
                             }
                             
                             // Interrupt all working threads, if not me and only if they are processing a later job
-                            for (int i = 0; i < this.threads.length; i++) {
-                                if ((this.threads[i] != this) && this.threads[i].isWorking() && (this.threads[i].getCurrentIdx() > this.currentIdx)) {
-                                    this.threads[i].interrupt();
+                            for (int i = 0; i < ThreadPool.this.threads.length; i++) {
+                                if ((ThreadPool.this.threads[i] != this) && ThreadPool.this.threads[i].isWorking() && (ThreadPool.this.threads[i].getCurrentIdx() > this.currentIdx)) {
+                                    ThreadPool.this.threads[i].interrupt();
                                 }
                             }
                             
                             break;
                         }
                         // Total number of iterations reached
-                        if (this.totalIterations.get() > this.maxIterations) {
-                            this.nextJob.set(this.jobs.length);
+                        if (ThreadPool.this.totalIterations.addAndGet(result.getIterationsPerTry()) > ThreadPool.this.maxIterations) {
+                            ThreadPool.this.nextJob.set(ThreadPool.this.jobs.length);
                         }
                         
                     }
@@ -153,31 +133,6 @@ public class ThreadPool {
             }
         }
         
-        /**
-         * Sets the allowed maximal number of iterations.
-         * @param maxIterations
-         */
-        public synchronized void setMaxIterations(int maxIterations) {
-            this.maxIterations = maxIterations;
-        }
-    }
-    
-    /**
-     * Helper class holding the result.
-     * TODO: Remove
-     * @author kohlmayer
-     *         
-     */
-    static class ResultHolder {
-        private final Result result;
-        
-        public ResultHolder(final Result result) {
-            this.result = result;
-        }
-        
-        public Result getResult() {
-            return this.result;
-        }
     }
     
     private final Condition          condition;
@@ -186,10 +141,11 @@ public class ThreadPool {
     private final ReentrantLock      lock;
     private final Thread             mainThread;
     private volatile int             mainThreadIdx;
+    private volatile int             maxIterations;
     private final AtomicInteger      nextJob;
-    private final int                numJobs;
                                      
-    private final ResultHolder[]     results;
+    private final int                numJobs;
+    private final Result[]           results;
     private final PoolThread[]       threads;
     private final AtomicInteger      totalIterations;
     private int                      totalTries;
@@ -203,7 +159,7 @@ public class ThreadPool {
     public ThreadPool(int numThreads, int numJobs) {
         this.numJobs = numJobs;
         this.jobs = new Callable[numJobs];
-        this.results = new ResultHolder[numJobs];
+        this.results = new Result[numJobs];
         this.mainThread = Thread.currentThread();
         
         this.lock = new ReentrantLock();
@@ -216,7 +172,7 @@ public class ThreadPool {
         // Create threads. Main thread is also considered to be a thread.
         this.threads = new PoolThread[numThreads - 1];
         for (int i = 0; i < this.threads.length; i++) {
-            this.threads[i] = new PoolThread(this.jobs, this.results, this.nextJob, this.lock, this.condition, this.mainThread, this, this.threads, this.totalIterations);
+            this.threads[i] = new PoolThread(this);
         }
         
     }
@@ -245,11 +201,7 @@ public class ThreadPool {
         this.nextJob.set(0);
         this.totalIterations.set(0);
         this.totalTries = 0;
-        
-        // Set max iterations
-        for (int i = 0; i < this.threads.length; i++) {
-            this.threads[i].setMaxIterations(maxIterations);
-        }
+        this.maxIterations = maxIterations;
         
         // Wake all threads
         this.lock.lock();
@@ -264,12 +216,10 @@ public class ThreadPool {
             while ((this.mainThreadIdx = this.nextJob.getAndIncrement()) < this.jobs.length) {
                 final Callable<Result> job = this.jobs[this.mainThreadIdx];
                 final Result result = job.call();
-                final ResultHolder rh = new ResultHolder(result);
-                this.results[this.mainThreadIdx] = rh;
-                this.totalIterations.addAndGet(rh.getResult().getIterationsPerTry());
+                this.results[this.mainThreadIdx] = result;
                 
                 // I've found a result. No other job has to be calculated.
-                if ((rh.getResult() != null) && (rh.getResult().getSolution() != null)) {
+                if (result.getSolution() != null) {
                     this.nextJob.set(this.jobs.length);
                     
                     // Interrupt all working threads, if they are processing a later job
@@ -281,7 +231,7 @@ public class ThreadPool {
                 }
                 
                 // Total number of iterations reached
-                if (this.totalIterations.get() > maxIterations) {
+                if (this.totalIterations.addAndGet(result.getIterationsPerTry()) > maxIterations) {
                     this.nextJob.set(this.jobs.length);
                 }
                 
@@ -305,8 +255,8 @@ public class ThreadPool {
         for (int i = 0; i < this.results.length; i++) {
             if (this.results[i] != null) {
                 this.totalTries++;
-                if ((result == null) && (this.results[i].getResult().getSolution() != null)) { // result found.
-                    result = this.results[i].getResult();
+                if ((result == null) && (this.results[i].getSolution() != null)) { // result found.
+                    result = this.results[i];
                 }
             }
             // Clear jobs and results
