@@ -16,7 +16,7 @@ public class ThreadPool {
         
         private volatile int     currentIdx;
         private boolean          isClosed;
-        private boolean          isWorking;
+        private volatile boolean isWorking;
         private final ThreadPool poolHolder;
         private final Thread     self;
                                  
@@ -77,7 +77,7 @@ public class ThreadPool {
          * Is the thread working?
          * @return
          */
-        public synchronized boolean isWorking() {
+        public boolean isWorking() {
             return this.isWorking;
         }
         
